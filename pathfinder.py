@@ -26,14 +26,17 @@ ORANGE = (255, 165, 0)
 GREY = (128, 128, 128)
 
 
+
 class Node:
     """Representa uma célula no grid."""
     def __init__(self, row, col, width, total_rows):
         self.row = row
         self.col = col
-        self.x = row * width
-        self.y = col * width
-        self.color = WHITE
+        # x = pixel horizontal (col * width), y = pixel vertical (row * width)
+        self.x = col * width
+        self.y = row * width
+        # state: 'empty','obstacle','start','end','open','closed','path'
+        self.state = 'empty'
         self.neighbors = []
         self.width = width
         self.total_rows = total_rows
@@ -43,41 +46,82 @@ class Node:
         return self.row, self.col
 
     def is_obstacle(self):
-        return self.color == BLACK
+        return self.state == 'obstacle'
 
     def is_start(self):
-        return self.color == PURPLE
+        return self.state == 'start'
 
     def is_end(self):
-        return self.color == ORANGE
+        return self.state == 'end'
 
     def is_path(self):
-        return self.color == BLUE
+        return self.state == 'path'
+
+    def is_open(self):
+        return self.state == 'open'
+
+    def is_closed(self):
+        return self.state == 'closed'
 
     def reset(self):
-        self.color = WHITE
+        self.state = 'empty'
         self.parent = None
 
     def make_start(self):
-        self.color = PURPLE
+        self.state = 'start'
 
     def make_closed(self):
-        self.color = RED
+        self.state = 'closed'
 
     def make_open(self):
-        self.color = GREEN
+        self.state = 'open'
 
     def make_obstacle(self):
-        self.color = BLACK
+        self.state = 'obstacle'
 
     def make_end(self):
-        self.color = ORANGE
+        self.state = 'end'
 
     def make_path(self):
-        self.color = BLUE
+        self.state = 'path'
 
     def draw(self, win):
-        pygame.draw.rect(win, self.color, (self.x, self.y, self.width, self.width))
+        # Recalcula posição/size baseado no tamanho atual da janela
+        surf = pygame.display.get_surface()
+        if surf is not None:
+            actual_width = surf.get_width()
+        else:
+            actual_width = WIDTH
+        gap = actual_width // self.total_rows
+        x = self.col * gap
+        y = self.row * gap
+        size = gap
+
+        # Seleciona cores segundo o tema atual
+        theme = THEMES.get(CURRENT_THEME, THEMES['default'])
+        color_map = {
+            'empty': WHITE,
+            'obstacle': theme['obstacle'],
+            'start': theme['start'],
+            'end': theme['end'],
+            'open': theme['open'],
+            'closed': theme['closed'],
+            'path': theme['path'],
+        }
+        color = color_map.get(self.state, WHITE)
+        pygame.draw.rect(win, color, (x, y, size, size))
+
+        # Desenha letra para início/fim (I = Início, F = Fim)
+        if self.state in ('start', 'end'):
+            try:
+                font_size = max(12, size // 2)
+                font = pygame.font.SysFont(None, font_size)
+                letter = 'I' if self.state == 'start' else 'F'
+                txt = font.render(letter, True, BLACK)
+                txt_rect = txt.get_rect(center=(x + size//2, y + size//2))
+                win.blit(txt, txt_rect)
+            except Exception:
+                pass
 
     def update_neighbors(self, grid):
         """Atualiza lista de vizinhos 4-direções (ignora obstáculos)."""
@@ -134,6 +178,46 @@ def play_error_sound():
         pass
 
 
+# Temas de cor por algoritmo
+THEMES = {
+    'default': {
+        'start': PURPLE,
+        'end': ORANGE,
+        'obstacle': BLACK,
+        'open': GREEN,
+        'closed': RED,
+        'path': BLUE,
+    },
+    'astar': {
+        'start': PURPLE,
+        'end': ORANGE,
+        'obstacle': BLACK,
+        'open': (0, 200, 200),
+        'closed': (150, 0, 200),
+        'path': (0, 120, 255),
+    },
+    'dijkstra': {
+        'start': PURPLE,
+        'end': ORANGE,
+        'obstacle': BLACK,
+        'open': (0, 180, 0),
+        'closed': (200, 80, 80),
+        'path': (255, 140, 0),
+    }
+}
+
+# Tema corrente (default)
+CURRENT_THEME = 'default'
+
+
+def set_theme(name: str):
+    global CURRENT_THEME
+    if name in THEMES:
+        CURRENT_THEME = name
+    else:
+        CURRENT_THEME = 'default'
+
+
 def make_grid(rows, width):
     grid = []
     gap = width // rows
@@ -146,15 +230,21 @@ def make_grid(rows, width):
 
 
 def draw_grid_lines(win, rows, width):
-    gap = width // rows
+    surf = pygame.display.get_surface()
+    if surf is not None:
+        actual_width = surf.get_width()
+    else:
+        actual_width = width
+    gap = actual_width // rows
     for i in range(rows):
-        pygame.draw.line(win, GREY, (0, i * gap), (width, i * gap))
-        for j in range(rows):
-            pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, width))
+        pygame.draw.line(win, GREY, (0, i * gap), (actual_width, i * gap))
+    for j in range(rows):
+        pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, actual_width))
 
 
 def draw(win, grid, rows, width):
     win.fill(WHITE)
+    # redesenha os nós (Node.draw fará o cálculo baseado no tamanho atual)
     for row in grid:
         for node in row:
             node.draw(win)
@@ -163,7 +253,13 @@ def draw(win, grid, rows, width):
 
 
 def get_clicked_pos(pos, rows, width):
-    gap = width // rows
+    # Usa o tamanho atual da janela para calcular gap (corrige problemas de DPI/rescale)
+    surf = pygame.display.get_surface()
+    if surf is not None:
+        actual_width = surf.get_width()
+    else:
+        actual_width = width
+    gap = actual_width // rows
     x, y = pos
     row = y // gap
     col = x // gap
@@ -179,7 +275,6 @@ def dumb_search(draw, grid, start, end):
     visited = set()
     stack = [start]
     start.parent = None
-    start.g_score = 0
 
     while stack:
         # Mantém a janela responsiva
@@ -274,6 +369,10 @@ def main_app(win, width):
     ROWS = 40
     grid = make_grid(ROWS, width)
 
+    # Modos de pincel (largura em células, sempre ímpar para centralizar)
+    BRUSH_SIZES = [1, 3, 5]
+    brush_index = 0
+
     start = None
     end = None
 
@@ -281,9 +380,56 @@ def main_app(win, width):
     while run:
         draw(win, grid, ROWS, width)
 
+        # Desenha destaque da célula sob o cursor (retângulo translúcido)
+        try:
+            surf = pygame.display.get_surface()
+            if surf is not None:
+                actual_width = surf.get_width()
+            else:
+                actual_width = width
+            gap = actual_width // ROWS
+            mx, my = pygame.mouse.get_pos()
+            hover_row = my // gap
+            hover_col = mx // gap
+            if 0 <= hover_row < ROWS and 0 <= hover_col < ROWS:
+                theme = THEMES.get(CURRENT_THEME, THEMES['default'])
+                hcolor = theme.get('open', (200, 200, 0))
+
+                # pinta destaque central
+                highlight = pygame.Surface((gap, gap), pygame.SRCALPHA)
+                highlight.fill((hcolor[0], hcolor[1], hcolor[2], 90))
+                win.blit(highlight, (hover_col * gap, hover_row * gap))
+
+                # desenha contorno do pincel (quadrado de brush_size)
+                brush = BRUSH_SIZES[brush_index]
+                radius = brush // 2
+                left = max(0, hover_col - radius)
+                top = max(0, hover_row - radius)
+                right = min(ROWS - 1, hover_col + radius)
+                bottom = min(ROWS - 1, hover_row + radius)
+                outline_rect = pygame.Rect(left * gap, top * gap, (right - left + 1) * gap, (bottom - top + 1) * gap)
+                pygame.draw.rect(win, (0, 0, 0), outline_rect, 2)
+                pygame.display.update(outline_rect)
+        except Exception:
+            pass
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return
+
+            # Permite pintar/arrastar mantendo o botão pressionado
+            if event.type == pygame.MOUSEMOTION:
+                buttons = event.buttons if hasattr(event, 'buttons') else pygame.mouse.get_pressed()
+                if buttons[0]:
+                    pos = event.pos
+                    row, col = get_clicked_pos(pos, ROWS, width)
+                    if 0 <= row < ROWS and 0 <= col < ROWS:
+                        apply_brush(grid, ROWS, row, col, BRUSH_SIZES[brush_index], make_obstacle=True)
+                if buttons[2]:
+                    pos = event.pos
+                    row, col = get_clicked_pos(pos, ROWS, width)
+                    if 0 <= row < ROWS and 0 <= col < ROWS:
+                        apply_brush(grid, ROWS, row, col, BRUSH_SIZES[brush_index], make_obstacle=False)
 
             if pygame.mouse.get_pressed()[0]:
                 pos = pygame.mouse.get_pos()
@@ -298,15 +444,15 @@ def main_app(win, width):
                     end = node
                     end.make_end()
                 elif node != end and node != start:
-                    node.make_obstacle()
+                    # aplica pincel ao clicar
+                    apply_brush(grid, ROWS, row, col, BRUSH_SIZES[brush_index], make_obstacle=True)
 
             elif pygame.mouse.get_pressed()[2]:
                 pos = pygame.mouse.get_pos()
                 row, col = get_clicked_pos(pos, ROWS, width)
                 if row >= ROWS or col >= ROWS:
                     continue
-                node = grid[row][col]
-                node.reset()
+                apply_brush(grid, ROWS, row, col, BRUSH_SIZES[brush_index], make_obstacle=False)
                 if node == start:
                     start = None
                 if node == end:
@@ -318,6 +464,8 @@ def main_app(win, width):
                     for row in grid:
                         for node in row:
                             node.update_neighbors(grid)
+                    # define tema para A*
+                    set_theme('astar')
                     play_click_sound()
                     _draw_status(win, "Executando A* (placeholder)...")
                     dumb_search(lambda: draw(win, grid, ROWS, width), grid, start, end)
@@ -327,6 +475,8 @@ def main_app(win, width):
                     for row in grid:
                         for node in row:
                             node.update_neighbors(grid)
+                    # define tema para Dijkstra
+                    set_theme('dijkstra')
                     play_click_sound()
                     _draw_status(win, "Executando Dijkstra (placeholder)...")
                     dumb_search(lambda: draw(win, grid, ROWS, width), grid, start, end)
@@ -336,6 +486,11 @@ def main_app(win, width):
                     start = None
                     end = None
                     grid = make_grid(ROWS, width)
+
+                # Alterna modos de pincel
+                if event.key == pygame.K_b:
+                    brush_index = (brush_index + 1) % len(BRUSH_SIZES)
+                    _draw_status(win, f"Tamanho do pincel: {BRUSH_SIZES[brush_index]}x{BRUSH_SIZES[brush_index]}")
 
                 if event.key == pygame.K_r:
                     for row in grid:
@@ -348,6 +503,12 @@ def main_app(win, width):
                             if node.is_end():
                                 end = node
                                 end.make_end()
+                # Gerar labirinto automático
+                if event.key == pygame.K_m:
+                    play_click_sound()
+                    _draw_status(win, "Gerando labirinto...")
+                    generate_maze(grid, ROWS)
+                    _draw_status(win, "Labirinto gerado. Defina início e fim.")
 
 
 def main_menu(win, width):
@@ -410,6 +571,10 @@ def main_menu(win, width):
                     _draw_status(win, status)
                     main_app(win, width)
                     status = "Clique em 'Iniciar' para abrir o grid."
+                # alterna modo de pincel se clicar com Ctrl + botão esquerdo no menu (opcional)
+                elif pygame.key.get_mods() & pygame.KMOD_CTRL:
+                    # não faz nada específico aqui — comportamento mantido no grid
+                    pass
                 elif tutorial_btn.is_clicked(pos):
                     play_click_sound()
                     show_tutorial_screen(win)
@@ -428,6 +593,7 @@ def main_menu(win, width):
                     return
 
 
+
 def _draw_status(win, text):
     """Desenha uma barra de status na parte inferior com texto em pt-br."""
     font = pygame.font.SysFont(None, 20)
@@ -437,6 +603,70 @@ def _draw_status(win, text):
     txt = font.render(text, True, BLACK)
     win.blit(txt, (8, WIDTH - 22))
     pygame.display.update(rect)
+
+
+def generate_maze(grid, rows):
+    """Gera um labirinto simples usando algoritmo de backtracker (depth-first).
+
+    A função assume que `rows` é ímpar para um melhor resultado; caso não
+    seja, o algoritmo ainda funciona, mas o labirinto pode ficar diferente.
+    """
+    # Marca todas as células como obstáculos
+    for r in range(rows):
+        for c in range(rows):
+            grid[r][c].make_obstacle()
+
+    # Coordenadas dos caminhos serão as células com índices ímpares
+    start_r, start_c = 1, 1
+    if start_r >= rows or start_c >= rows:
+        return
+
+    stack = [(start_r, start_c)]
+    grid[start_r][start_c].reset()
+
+    directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
+    import random as _rand
+
+    while stack:
+        r, c = stack[-1]
+        neighbors = []
+        for dr, dc in directions:
+            nr, nc = r + dr, c + dc
+            if 0 < nr < rows and 0 < nc < rows and grid[nr][nc].is_obstacle():
+                neighbors.append((nr, nc))
+
+        if neighbors:
+            nr, nc = _rand.choice(neighbors)
+            # Remove parede entre (r,c) e (nr,nc)
+            wall_r = (r + nr) // 2
+            wall_c = (c + nc) // 2
+            grid[wall_r][wall_c].reset()
+            grid[nr][nc].reset()
+            stack.append((nr, nc))
+        else:
+            stack.pop()
+
+
+def apply_brush(grid, rows, center_row, center_col, brush, make_obstacle=True):
+    """Aplica o pincel (quadrado de tamanho `brush`) centrado em (center_row, center_col).
+
+    Se `make_obstacle` for True, desenha obstáculos; caso contrário, reseta as células.
+    Não sobrescreve os nós start/end.
+    """
+    radius = brush // 2
+    for dr in range(-radius, radius + 1):
+        for dc in range(-radius, radius + 1):
+            r = center_row + dr
+            c = center_col + dc
+            if 0 <= r < rows and 0 <= c < rows:
+                node = grid[r][c]
+                if node.is_start() or node.is_end():
+                    continue
+                if make_obstacle:
+                    node.make_obstacle()
+                else:
+                    node.reset()
+
 
 
 if __name__ == "__main__":

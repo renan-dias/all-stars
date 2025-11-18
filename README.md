@@ -59,7 +59,29 @@ Uso rápido (interface)
     - D → executa Dijkstra (placeholder).
     - C → limpa todo o grid.
     - R → limpa apenas o caminho, preservando obstáculos.
+  - Letras visuais: o nó INÍCIO é marcado com 'I' e o nó FIM com 'F' no grid.
+  - Geração de labirinto: pressione `M` para gerar automaticamente um labirinto (algoritmo backtracker).
+  - Coloração por algoritmo: ao executar A* ou Dijkstra, o visualizador muda o tema de cores para cada algoritmo para facilitar comparação.
 
+  Precisão ao desenhar / dicas de pintura
+
+  - Para garantir que um bloco fique exatamente na célula desejada, clique na célula correta — o grid está alinhado por linhas e colunas e o clique é mapeado de forma precisa.
+  - Suporte a arrastar: mantenha o botão esquerdo pressionado e arraste para pintar múltiplas células (desenho contínuo). Use o botão direito para apagar enquanto arrasta.
+  - O aplicativo não permite sobrescrever o nó INÍCIO ('I') e o nó FIM ('F') ao pintar — primeiro posicione I e F, depois desenhe obstáculos.
+
+   Destaque visual de célula
+ 
+   - Agora o visualizador mostra um destaque translúcido sobre a célula sob o cursor — isso ajuda a garantir que o bloco será colocado exatamente na célula desejada antes de você clicar.
+   - A cor do destaque segue uma versão suave da paleta do tema atual (A* / Dijkstra), para facilitar testes comparativos.
+ 
+Modos de pincel
+
+- O visualizador agora possui modos de pincel para desenhar blocos maiores facilmente:
+  - `1x1` (padrão)
+  - `3x3`
+  - `5x5`
+- Pressione `B` para alternar entre os modos de pincel. O tamanho atual é mostrado na barra de status.
+- O contorno do pincel é exibido enquanto você move o cursor, ajudando a posicionar o desenho exato.
 Efeitos sonoros e visuais
 
 - Efeitos de hover e clique são reproduzidos via `winsound.Beep` no Windows quando disponível. Caso contrário, o programa prossegue sem som.

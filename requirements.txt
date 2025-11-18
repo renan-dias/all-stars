@@ -1,0 +1,3 @@
+pygame>=2.1.0
+numpy>=1.21.0
+# Se desejar travar versões, substitua por por ex. 'pygame==2.1.3'
