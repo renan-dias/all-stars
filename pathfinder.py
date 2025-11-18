@@ -464,7 +464,8 @@ def main_app(win, width):
                     for row in grid:
                         for node in row:
                             node.update_neighbors(grid)
-                    # define tema para A*
+                    # limpa as marcações de outro algoritmo e define tema para A*
+                    clear_algorithm_marks(grid)
                     set_theme('astar')
                     play_click_sound()
                     _draw_status(win, "Executando A* (placeholder)...")
@@ -475,7 +476,8 @@ def main_app(win, width):
                     for row in grid:
                         for node in row:
                             node.update_neighbors(grid)
-                    # define tema para Dijkstra
+                    # limpa as marcações de outro algoritmo e define tema para Dijkstra
+                    clear_algorithm_marks(grid)
                     set_theme('dijkstra')
                     play_click_sound()
                     _draw_status(win, "Executando Dijkstra (placeholder)...")
@@ -666,6 +668,17 @@ def apply_brush(grid, rows, center_row, center_col, brush, make_obstacle=True):
                     node.make_obstacle()
                 else:
                     node.reset()
+
+
+def clear_algorithm_marks(grid):
+    """Limpa as marcações temporárias de algoritmo (open/closed/path).
+
+    Mantém obstáculos, start e end.
+    """
+    for row in grid:
+        for node in row:
+            if node.state in ('open', 'closed', 'path'):
+                node.reset()
 
 
 
